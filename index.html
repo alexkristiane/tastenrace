@@ -1288,7 +1288,7 @@ const fingerPathPanel = document.getElementById('fingerPathPanel');
 const fingerPathInput = document.getElementById('fingerPathInput');
 const fingerPathStart = document.getElementById('fingerPathStart');
 
-// ── Fingerzuordnung (Zehnfingersystem: a1a s2s s3s d4d f5f f6f j7j j8j k9k l0l) ──
+// ── Fingerzuordnung (Zehnfingersystem wie in den Übungen: a1a a2a s3s d4d f5f f6f j7j j8j k9k l0l) ──
 // Finger: lk/lr/lm/lz = links kleiner/Ring/Mittel/Zeigefinger, rz/rm/rr/rk = rechts, d = Daumen
 const FINGER_INFO = {
     lk:{name:'linker kleiner Finger',  home:'a', hand:'l'},
@@ -1302,8 +1302,8 @@ const FINGER_INFO = {
     d: {name:'Daumen',                 home:' ', hand:'-'}
 };
 const FINGER_KEYS = {
-    lk:['^','1','q','a','y','<'],
-    lr:['2','3','w','s','x'],
+    lk:['^','1','2','q','a','y','<'],
+    lr:['3','w','s','x'],
     lm:['4','e','d','c'],
     lz:['5','6','r','t','f','g','v','b'],
     rz:['7','8','z','u','h','j','n','m'],
