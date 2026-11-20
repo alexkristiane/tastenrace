@@ -698,6 +698,8 @@ body.ln-locked #printBtn{animation:print-pulse .9s ease-in-out infinite alternat
 
 
         #print-stats{display:block !important;margin-top:12px;font-size:0.9em;border-top:1px solid #ccc;padding-top:6px;}
+        #print-code{display:block !important;margin-top:4px;font-size:0.9em;}
+        #print-code b{font-family:Consolas,"Courier New",monospace;letter-spacing:1px;}
         h1{display:none !important;}
     }
     /* ===================== ENDE DRUCK-LAYOUT ===================== */
@@ -1852,6 +1854,7 @@ function exportToCSV() {
     csv += `Note;${grade}\n`;
     csv += `Gesamtanschläge;${totalKeystrokes}\n`;
     csv += `Zeit (Minuten);${usedMins.replace('.', ',')}\n`;
+    csv += `Prüfcode;${getAttemptCode()}\n`;
 
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -1905,6 +1908,24 @@ document.getElementById('ph-source-text').textContent =
         document.getElementById('ph-datum-ln').textContent = '';
         document.body.setAttribute('data-print-mode', 'homework');
     }
+    // Prüfcode: in der Fußzeile jeder Seite (Chrome/Edge) und zusätzlich unter der Auswertung
+    const code = getAttemptCode();
+    let footerStyle = document.getElementById('print-footer-style');
+    if (!footerStyle) {
+        footerStyle = document.createElement('style');
+        footerStyle.id = 'print-footer-style';
+        document.head.appendChild(footerStyle);
+    }
+    footerStyle.textContent = '@page{@bottom-right{content:"Prüfcode: ' + code +
+        '";font-family:Arial,Helvetica,sans-serif;font-size:8.5pt;color:#444;}}';
+    let codeLine = document.getElementById('print-code');
+    if (!codeLine) {
+        codeLine = document.createElement('div');
+        codeLine.id = 'print-code';
+        codeLine.style.display = 'none';
+        summaryDiv.appendChild(codeLine);
+    }
+    codeLine.innerHTML = 'Prüfcode: <b>' + code + '</b>';
     document.getElementById('print-area').classList.remove('hidden');
 }
 
@@ -1945,6 +1966,38 @@ let timerMode='countdown', startDurationSecs=0, timeLeft=0, elapsedSecs=0;
 let currentIndex=0, currentWord='', startedInput='';
 let gameActive = false;
 let currentSourceName = '';   // Name der Übung bzw. Datei, die abgeschrieben wird
+let attemptSeed = '';         // Zufallswert je Schreibdurchgang (für den Prüfcode)
+
+// ─── Prüfcode ────────────────────────────────────────────────────────────────
+// Jeder Schreibdurchgang bekommt beim Start einen Zufallswert. Der Prüfcode wird aus
+// diesem Zufallswert und dem tatsächlich getippten Text berechnet. Wer denselben
+// Durchgang mehrfach druckt (auch mit anderem Namen), bekommt denselben Code; erst ein
+// neuer Durchgang (Start) ergibt einen neuen Code. Gleiche Codes bei verschiedenen
+// Schülern = gleiche Arbeit.
+const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // ohne 0/O, 1/I
+function newAttemptSeed(){
+    const a = new Uint32Array(2);
+    try { crypto.getRandomValues(a); } catch (_) { a[0] = Math.random() * 2**32; a[1] = Date.now(); }
+    return a[0].toString(36) + '-' + a[1].toString(36);
+}
+function hash53(str, seed = 0){
+    let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+    for (let i = 0; i < str.length; i++) {
+        const c = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ c, 2654435761);
+        h2 = Math.imul(h2 ^ c, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+function getAttemptCode(){
+    if (!attemptSeed) attemptSeed = newAttemptSeed();
+    let n = hash53(attemptSeed + '|' + buildRawText());
+    let out = '';
+    for (let i = 0; i < 8; i++) { out += CODE_ALPHABET[n % 32]; n = Math.floor(n / 32); }
+    return out.slice(0, 4) + '-' + out.slice(4);
+}
 
 
 // ─── Hilfsfunktionen ─────────────────────────────────────────────────────────
@@ -2425,6 +2478,7 @@ startBtn.addEventListener('click',()=>{
     if (toggleLN.checked && !validateLNFields()) return;
     clearLnBackup();
     resetGame();
+    attemptSeed = newAttemptSeed();
     if(!wordList.length) wordList=DEFAULT_LIST;
     totalLinesSpan.textContent=wordList.length;
     gameActive = true;
@@ -2828,7 +2882,7 @@ textViewBtn.addEventListener('click', async () => {
     document.getElementById('tv-left').textContent   = namenfeld.value.trim() || '___________________';
     document.getElementById('tv-center').textContent = title;
     document.getElementById('tv-right').textContent  = todayISO();
-    tvText.textContent = buildRawText();
+    tvText.textContent = buildRawText() + '\n\nPrüfcode: ' + getAttemptCode();
     tvMsg.textContent = '';
     textViewSection.classList.remove('hidden');
     textViewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2885,7 +2939,7 @@ function saveLnBackup(status) {
         name: namenfeld.value, nr: lnNummer.value, klasse: lnKlasse.value,
         duration: durationInput.value, source: currentSourceName,
         fileInfo: fileInfo.textContent,
-        wordList, attempts, currentIndex, currentWord, startedInput,
+        wordList, attempts, currentIndex, currentWord, startedInput, attemptSeed,
         timerMode, startDurationSecs, timeLeft, elapsedSecs
     };
     try { localStorage.setItem(LN_BACKUP_KEY, JSON.stringify(data)); } catch (_) {}
@@ -2917,6 +2971,7 @@ function restoreLnBackup(d) {
 
     resetGame();
     attempts = Array.isArray(d.attempts) ? d.attempts : [];
+    attemptSeed = d.attemptSeed || '';
     currentIndex = d.currentIndex || 0;
     currentWord = d.currentWord || '';
     startedInput = d.startedInput || '';
